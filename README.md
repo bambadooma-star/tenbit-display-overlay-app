@@ -10,7 +10,8 @@
 
 <p align="center">
   <strong>The Professional Real-Time Windows Desktop HUD for True 10-bit SDR & HDR Display Verification.</strong><br>
-  Stop guessing if your color pipeline is truly delivering 1.07 billion colors. Verify your hardware, DWM swapchains, and active application content in real time.
+  Stop guessing if your color pipeline is truly delivering 1.07 billion colors. Verify your hardware, DWM swapchains, and active application content in real time.<br><br>
+  <a href="https://bambadooma-star.github.io/tenbit-display-overlay-app/"><strong>🌐 Visit Official Landing Page & Interactive Demo »</strong></a>
 </p>
 
 ---
