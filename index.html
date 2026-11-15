@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TenBit Display Overlay — Unlock True 10-Bit Color on Windows</title>
+  <meta name="description" content="The ultimate Windows 10/11 utility for forcing native 10-bit D3D11 swapchains, eliminating color banding, and unlocking 1.07-billion color SDR & HDR video playback.">
+  <meta name="keywords" content="10-bit, display overlay, Windows 10-bit, color banding, D3D11, HDR, SDR, NVDEC, 1.07 billion colors, MPV 10-bit">
+  
+  <!-- Open Graph / Social Meta -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="TenBit Display Overlay — True 10-Bit Color for Windows">
+  <meta property="og:description" content="Real-time D3D11 swapchain telemetry, hardware 10-bit playback engine, and banding elimination.">
+  <meta property="og:url" content="https://bambadooma-star.github.io/tenbit-display-overlay-app/">
+  
+  <!-- Google Fonts & Tailwind CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              cyan: '#00f2fe',
+              blue: '#4facfe',
+              purple: '#7928ca',
+              pink: '#ff0080',
+              dark: '#07090e',
+              card: '#0f141f',
+              border: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #07090e;
+      color: #f1f5f9;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow-x: hidden;
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .glow-cyan {
+      box-shadow: 0 0 50px -10px rgba(0, 242, 254, 0.3);
+    }
+    .glass-card {
+      background: rgba(15, 20, 31, 0.7);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card:hover {
+      border-color: rgba(0, 242, 254, 0.3);
+    }
+    /* Comparison slider styles */
+    .compare-container {
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .compare-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    /* Simulated 8-bit banding gradient */
+    .gradient-8bit {
+      background: repeating-linear-gradient(
+        to right,
+        #050811,
+        #050811 12px,
+        #091024 12px,
+        #091024 24px,
+        #0e1a38 24px,
+        #0e1a38 36px,
+        #14254f 36px,
+        #14254f 48px,
+        #1b3269 48px,
+        #1b3269 60px,
+        #244288 60px,
+        #244288 72px,
+        #2e53a8 72px,
+        #2e53a8 84px,
+        #3a67cc 84px,
+        #3a67cc 96px,
+        #497ef0 96px,
+        #497ef0 108px,
+        #5e93fb 108px,
+        #5e93fb 120px,
+        #79aaff 120px
+      );
+    }
+    /* Simulated silky smooth 10-bit gradient */
+    .gradient-10bit {
+      background: linear-gradient(to right, #050811, #13244c, #2b4ea0, #4f82f2, #7eaeff);
+    }
+  </style>
+</head>
+<body class="min-h-screen selection:bg-cyan-500 selection:text-black">
+
+  <!-- Ambient Glow Effects -->
+  <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[450px] bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none -z-10"></div>
+  <div class="fixed top-1/3 right-[-100px] w-[500px] h-[400px] bg-purple-600/10 rounded-full blur-[160px] pointer-events-none -z-10"></div>
+
+  <!-- Header / Navigation -->
+  <header class="sticky top-0 z-50 backdrop-blur-xl bg-[#07090e]/80 border-b border-white/5">
+    <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-3 group">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 p-[1.5px] transition group-hover:scale-105">
+          <div class="w-full h-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center">
+            <span class="font-bold text-lg font-mono text-cyan-400">10b</span>
+          </div>
+        </div>
+        <div>
+          <span class="font-bold text-lg tracking-tight text-white block">TenBit Display</span>
+          <span class="text-[11px] font-mono uppercase tracking-wider text-cyan-400 block -mt-1">D3D11 Overlay</span>
+        </div>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+        <a href="#features" class="hover:text-cyan-400 transition">Features</a>
+        <a href="#comparison" class="hover:text-cyan-400 transition">8-Bit vs 10-Bit</a>
+        <a href="#telemetry" class="hover:text-cyan-400 transition">Live HUD</a>
+        <a href="#specs" class="hover:text-cyan-400 transition">Specifications</a>
+        <a href="#faq" class="hover:text-cyan-400 transition">FAQ</a>
+      </nav>
+
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app" target="_blank" class="text-sm font-medium text-slate-300 hover:text-white flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5 transition">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span class="hidden sm:inline">GitHub</span>
+        </a>
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app/releases/download/v1.0.0/TenBitDisplayOverlay.exe" class="relative group overflow-hidden rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-2.5 text-sm font-semibold text-black transition shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-[1.02]">
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            Download v1.0.0
+          </span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="relative pt-24 pb-20 overflow-hidden">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+      
+      <!-- Pill Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 text-xs font-mono mb-8">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+        DirectX 11 Native Swapchain Engine &amp; HUD
+      </div>
+
+      <!-- Main Headline -->
+      <h1 class="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight max-w-5xl mx-auto leading-[1.1] mb-6">
+        Unlock <span class="gradient-text">1.07 Billion Colors</span> on Windows.
+      </h1>
+
+      <p class="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto mb-10 font-normal leading-relaxed">
+        Stop Windows DWM and web browsers from crushing your 10-bit monitor into washed-out 8-bit SDR. TenBit Display Overlay forces true 10-bit hardware swapchains, verifies real bit depth, and eliminates color banding forever.
+      </p>
+
+      <!-- Primary Action Buttons -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14">
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app/releases/download/v1.0.0/TenBitDisplayOverlay.exe" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-black font-bold text-base flex items-center justify-center gap-3 shadow-xl shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] transition">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          Download Standalone App (.exe)
+        </a>
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app" target="_blank" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-white font-semibold text-base flex items-center justify-center gap-2 hover:bg-slate-800 transition">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub Repository
+        </a>
+      </div>
+
+      <!-- Quick Highlights Meta -->
+      <div class="flex flex-wrap items-center justify-center gap-y-3 gap-x-8 text-xs font-mono text-slate-400">
+        <span class="flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          No Install Needed (Portable 11 MB)
+        </span>
+        <span class="flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Zero Performance Overhead
+        </span>
+        <span class="flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Hardware NVDEC / VAAPI Decoding
+        </span>
+        <span class="flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Windows 10 / 11 64-bit Ready
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Visual Comparison: 8-Bit Banding vs 10-Bit Smooth -->
+  <section id="comparison" class="py-20 bg-slate-950/60 border-y border-white/5 relative">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center max-w-3xl mx-auto mb-14">
+        <h2 class="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-2">Visual Demonstration</h2>
+        <h3 class="text-3xl sm:text-4xl font-extrabold tracking-tight">The 10-Bit Advantage: 64x More Color Steps</h3>
+        <p class="text-slate-400 mt-3 text-sm sm:text-base">
+          8-bit display pipelines only allocate 256 shades per color channel, causing painful visual stair-stepping (color banding). 10-bit delivers 1,024 shades per channel — producing silky continuous sky gradients and deep shadow details.
+        </p>
+      </div>
+
+      <!-- Comparison Slider Box -->
+      <div class="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black">
+        <div id="compare-box" class="compare-container h-72 sm:h-96 w-full cursor-ew-resize">
+          <!-- 10-bit smooth background -->
+          <div class="absolute inset-0 gradient-10bit flex items-end p-6">
+            <div class="bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-cyan-500/30 font-mono text-xs text-cyan-300">
+              10-BIT PIPELINE: 1,024 STEPS / 1.07B COLORS (SILKY SMOOTH)
+            </div>
+          </div>
+          
+          <!-- 8-bit banded overlay -->
+          <div id="compare-overlay" class="compare-overlay w-1/2 gradient-8bit flex items-end p-6 border-r-2 border-white shadow-[0_0_20px_rgba(255,255,255,0.8)]">
+            <div class="bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-red-500/30 font-mono text-xs text-red-300 whitespace-nowrap">
+              8-BIT PIPELINE: 256 STEPS (VISIBLE COLOR BANDING)
+            </div>
+          </div>
+
+          <!-- Drag Handle Indicator -->
+          <div id="compare-handle" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-2xl pointer-events-none text-xs">
+            ⇄
+          </div>
+        </div>
+      </div>
+      <p class="text-center text-xs font-mono text-slate-500 mt-4">Drag the slider horizontally to compare 8-bit color quantization against 10-bit gradations</p>
+    </div>
+  </section>
+
+  <!-- Live HUD Showcase Component -->
+  <section id="telemetry" class="py-24 relative">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        
+        <div class="lg:col-span-6">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-purple-950/60 border border-purple-500/30 text-purple-300 text-xs font-mono mb-4">
+            ALWAYS-ON-TOP TELEMETRY
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-6">
+            Real-Time Bit Depth &amp; Swapchain Inspector
+          </h2>
+          <p class="text-slate-400 mb-6 leading-relaxed">
+            Never guess whether your active workflow is in true 10-bit or secretly clamped to 8-bit SDR. TenBit Display Overlay queries direct DXGI hardware outputs, active DWM swapchains, and monitor timings in real time.
+          </p>
+
+          <div class="space-y-4 font-mono text-xs">
+            <div class="flex items-start gap-3 p-3 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-cyan-400 mt-0.5">●</span>
+              <div>
+                <strong class="text-white block font-sans text-sm">True D3D11 Swapchain Telemetry</strong>
+                <span class="text-slate-400">Reports active swapchain pixel format (<code class="text-cyan-300">R10G10B10A2_UNORM</code>) and Direct3D feature levels.</span>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-cyan-400 mt-0.5">●</span>
+              <div>
+                <strong class="text-white block font-sans text-sm">Always-On-Top Mini HUD</strong>
+                <span class="text-slate-400">Position anywhere on multi-monitor setups. Completely transparent to mouse clicks when pinned.</span>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-lg bg-slate-900/60 border border-white/5">
+              <span class="text-cyan-400 mt-0.5">●</span>
+              <div>
+                <strong class="text-white block font-sans text-sm">Hardware Acceleration Status</strong>
+                <span class="text-slate-400">Monitors NVIDIA NVDEC, AMD AMF, and Intel QSV decoding states live (<code class="text-cyan-300">p010</code> format).</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sleek Mock HUD Visual -->
+        <div class="lg:col-span-6">
+          <div class="glass-card rounded-2xl p-6 shadow-2xl relative border border-cyan-500/20">
+            <!-- HUD Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-6">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span class="font-mono text-xs font-bold uppercase tracking-wider text-white">TenBit HUD v1.0.0</span>
+              </div>
+              <span class="font-mono text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40">D3D11: ACTIVE</span>
+            </div>
+
+            <!-- Telemetry Values -->
+            <div class="grid grid-cols-2 gap-4 font-mono text-xs mb-6">
+              <div class="p-4 rounded-xl bg-black/40 border border-white/5">
+                <span class="text-slate-400 block text-[11px] mb-1">COLOR DEPTH</span>
+                <span class="text-2xl font-bold text-cyan-300">10-BIT</span>
+                <span class="text-[10px] text-slate-500 block mt-1">1,073,741,824 Colors</span>
+              </div>
+
+              <div class="p-4 rounded-xl bg-black/40 border border-white/5">
+                <span class="text-slate-400 block text-[11px] mb-1">COLOR ENCODING</span>
+                <span class="text-2xl font-bold text-purple-300">RGB 4:4:4</span>
+                <span class="text-[10px] text-slate-500 block mt-1">Uncompressed Full Range</span>
+              </div>
+
+              <div class="p-4 rounded-xl bg-black/40 border border-white/5">
+                <span class="text-slate-400 block text-[11px] mb-1">SWAPCHAIN FORMAT</span>
+                <span class="text-sm font-bold text-slate-200 block truncate">R10G10B10A2</span>
+                <span class="text-[10px] text-emerald-400 block mt-1">DirectX 11 Hardware</span>
+              </div>
+
+              <div class="p-4 rounded-xl bg-black/40 border border-white/5">
+                <span class="text-slate-400 block text-[11px] mb-1">HARDWARE DECODER</span>
+                <span class="text-sm font-bold text-slate-200 block truncate">NVDEC (d3d11va)</span>
+                <span class="text-[10px] text-cyan-400 block mt-1">Pixel Format: p010</span>
+              </div>
+            </div>
+
+            <!-- Live Status Bar -->
+            <div class="p-3 rounded-lg bg-cyan-950/30 border border-cyan-500/20 flex items-center justify-between text-xs font-mono">
+              <span class="text-slate-300">Windows ACM Pipeline:</span>
+              <span class="text-emerald-400 font-bold">10-BIT SYNCHRONIZED</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section id="features" class="py-24 bg-slate-950/40 border-t border-white/5 relative">
+    <div class="max-w-7xl mx-auto px-6">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-2">Architected for Purists</h2>
+        <h3 class="text-3xl sm:text-4xl font-extrabold tracking-tight">Everything You Need for Native 10-Bit</h3>
+        <p class="text-slate-400 mt-3 text-sm sm:text-base">
+          Engineered specifically for creators, video editors, gamers, and visual enthusiasts who refuse 8-bit color degradation.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- Card 1 -->
+        <div class="glass-card p-8 rounded-2xl transition hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          </div>
+          <h4 class="text-lg font-bold text-white mb-2">D3D11 Native Swapchain Forcer</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Instructs Windows Desktop Window Manager (DWM) to allocate native <code class="text-cyan-300 font-mono text-xs">DXGI_FORMAT_R10G10B10A2_UNORM</code> render targets, preserving 10-bit integrity.
+          </p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="glass-card p-8 rounded-2xl transition hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          </div>
+          <h4 class="text-lg font-bold text-white mb-2">Bypass Browser 8-Bit Clamping</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Chrome and Edge force YouTube and web players into 8-bit SDR. TenBit Display Overlay routes streams directly into full-fidelity 10-bit hardware pipelines.
+          </p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="glass-card p-8 rounded-2xl transition hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <h4 class="text-lg font-bold text-white mb-2">NVIDIA NVDEC Hardware Decoders</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Direct GPU hardware decoding for VP9 Profile 2, HEVC Main 10, and H.264 at up to 8K 60fps with zero frame drops and minimal power draw.
+          </p>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="glass-card p-8 rounded-2xl transition hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <h4 class="text-lg font-bold text-white mb-2">Real-Time Photo &amp; Video Verifier</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Drag any image (HEIC, TIFF, PNG, JPG) or video file directly into the application to instantly inspect true underlying bit depth, color gamut, and chroma subsampling.
+          </p>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="glass-card p-8 rounded-2xl transition hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400 mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </div>
+          <h4 class="text-lg font-bold text-white mb-2">Universal Stream Resolver</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Automatically parses embedded iframe video players and complex CDN hosts into clean, direct 4K 10-bit MP4/HLS streams without ads or browser lag.
+          </p>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="glass-card p-8 rounded-2xl transition hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-6">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <h4 class="text-lg font-bold text-white mb-2">Anti-Tamper Hardened Binary</h4>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Protected with multi-layer bytecode encryption and dynamic memory integrity checks. Single standalone <code class="text-cyan-300 font-mono text-xs">.exe</code>, zero external dependencies.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Technical Specs -->
+  <section id="specs" class="py-20 border-t border-white/5">
+    <div class="max-w-4xl mx-auto px-6">
+      <div class="text-center mb-12">
+        <h2 class="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-2">Requirements</h2>
+        <h3 class="text-3xl font-extrabold tracking-tight">System Specifications</h3>
+      </div>
+
+      <div class="glass-card rounded-2xl overflow-hidden border border-white/10 font-mono text-sm">
+        <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-white/10">
+          
+          <div class="p-6 space-y-4">
+            <h4 class="font-sans font-bold text-white text-base">Operating System &amp; Graphics</h4>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between py-1 border-b border-white/5">
+                <span class="text-slate-400">OS:</span>
+                <span class="text-white">Windows 10 (20H2+) / Windows 11</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-white/5">
+                <span class="text-slate-400">Graphics API:</span>
+                <span class="text-cyan-300">DirectX 11 (D3D11 Feature Level 11_1+)</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-white/5">
+                <span class="text-slate-400">GPU Vendor:</span>
+                <span class="text-white">NVIDIA GeForce / AMD Radeon / Intel Arc</span>
+              </div>
+              <div class="flex justify-between py-1">
+                <span class="text-slate-400">Architecture:</span>
+                <span class="text-white">x64 (64-bit AMD/Intel)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <h4 class="font-sans font-bold text-white text-base">Display &amp; Pipeline</h4>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between py-1 border-b border-white/5">
+                <span class="text-slate-400">Panel Capability:</span>
+                <span class="text-white">Native 10-bit or 8-bit + FRC</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-white/5">
+                <span class="text-slate-400">Display Connection:</span>
+                <span class="text-white">DisplayPort 1.4+ / HDMI 2.0+</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-white/5">
+                <span class="text-slate-400">Color Encoding:</span>
+                <span class="text-purple-300">RGB 4:4:4 / YCbCr 4:4:4</span>
+              </div>
+              <div class="flex justify-between py-1">
+                <span class="text-slate-400">Windows Mode:</span>
+                <span class="text-white">ACM Enabled SDR or Native HDR</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section id="faq" class="py-20 bg-slate-950/60 border-t border-white/5">
+    <div class="max-w-4xl mx-auto px-6">
+      <div class="text-center mb-14">
+        <h2 class="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-2">Questions &amp; Answers</h2>
+        <h3 class="text-3xl font-extrabold tracking-tight">Frequently Asked Questions</h3>
+      </div>
+
+      <div class="space-y-4">
+        <details class="glass-card p-6 rounded-xl border border-white/5 cursor-pointer group">
+          <summary class="font-semibold text-white list-none flex items-center justify-between text-base">
+            Why does YouTube stream 8-bit even on my 10-bit monitor?
+            <span class="text-cyan-400 group-open:rotate-180 transition">▼</span>
+          </summary>
+          <p class="text-slate-400 text-sm mt-4 leading-relaxed font-sans">
+            Web browsers like Chrome and Edge check Windows HDR status. When Windows is in SDR mode (even with a 10-bit monitor), browsers report to YouTube that only standard 8-bit SDR is supported. YouTube then deliberately serves Profile 0 8-bit VP9. TenBit Display Overlay bypasses the browser entirely to request true 10-bit VP9 Profile 2 streams.
+          </p>
+        </details>
+
+        <details class="glass-card p-6 rounded-xl border border-white/5 cursor-pointer group">
+          <summary class="font-semibold text-white list-none flex items-center justify-between text-base">
+            Does this work on 8-bit + FRC monitors?
+            <span class="text-cyan-400 group-open:rotate-180 transition">▼</span>
+          </summary>
+          <p class="text-slate-400 text-sm mt-4 leading-relaxed font-sans">
+            Yes! 8-bit + FRC (Frame Rate Control) monitors are designed to accept a 10-bit input signal and rapidly cycle sub-pixels to produce all 1.07 billion colors. TenBit Display Overlay sends the full 10-bit signal across the cable so your monitor's internal FRC engine can perform at its peak.
+          </p>
+        </details>
+
+        <details class="glass-card p-6 rounded-xl border border-white/5 cursor-pointer group">
+          <summary class="font-semibold text-white list-none flex items-center justify-between text-base">
+            Do I need administrator privileges or installation?
+            <span class="text-cyan-400 group-open:rotate-180 transition">▼</span>
+          </summary>
+          <p class="text-slate-400 text-sm mt-4 leading-relaxed font-sans">
+            No installation is required. TenBit Display Overlay is packaged as a completely standalone, self-contained Windows executable. You can run it directly from your Desktop or USB drive without modifying Windows system files.
+          </p>
+        </details>
+
+        <details class="glass-card p-6 rounded-xl border border-white/5 cursor-pointer group">
+          <summary class="font-semibold text-white list-none flex items-center justify-between text-base">
+            Does the overlay impact gaming or GPU performance?
+            <span class="text-cyan-400 group-open:rotate-180 transition">▼</span>
+          </summary>
+          <p class="text-slate-400 text-sm mt-4 leading-relaxed font-sans">
+            Zero impact. The overlay uses efficient lightweight Direct3D 11 rendering with hardware swapchains. CPU usage remains under 0.1% and GPU usage is negligible.
+          </p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final Call to Action -->
+  <section class="py-24 relative overflow-hidden text-center border-t border-white/10">
+    <div class="max-w-4xl mx-auto px-6 relative z-10">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 text-xs font-mono mb-6">
+        STANDALONE RELEASE V1.0.0
+      </div>
+      <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6">
+        Ready for Authentic 10-Bit Color?
+      </h2>
+      <p class="text-slate-400 text-lg max-w-2xl mx-auto mb-10">
+        Download TenBit Display Overlay now and experience your monitor the way it was engineered to look.
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app/releases/download/v1.0.0/TenBitDisplayOverlay.exe" class="w-full sm:w-auto px-10 py-5 rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-black font-extrabold text-lg flex items-center justify-center gap-3 shadow-2xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105 transition">
+          <svg class="w-6 h-6 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          Download TenBitDisplayOverlay.exe
+        </a>
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app" target="_blank" class="w-full sm:w-auto px-8 py-5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-white font-semibold text-lg hover:bg-slate-800 transition">
+          Source Details on GitHub
+        </a>
+      </div>
+      <span class="block mt-4 text-xs font-mono text-slate-500">File size: ~11.2 MB • Windows 10/11 64-bit • Direct download</span>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="py-12 border-t border-white/5 text-slate-500 text-xs font-mono text-center">
+    <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        © 2026 TenBit Display Overlay. All rights reserved.
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app" target="_blank" class="hover:text-cyan-400 transition">GitHub</a>
+        <a href="https://github.com/bambadooma-star/tenbit-display-overlay-app/releases" target="_blank" class="hover:text-cyan-400 transition">Releases</a>
+        <a href="#features" class="hover:text-cyan-400 transition">Features</a>
+        <a href="#specs" class="hover:text-cyan-400 transition">Specifications</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactive Comparison Slider Script -->
+  <script>
+    const box = document.getElementById('compare-box');
+    const overlay = document.getElementById('compare-overlay');
+    const handle = document.getElementById('compare-handle');
+    let isDown = false;
+
+    function updateSlider(x) {
+      const rect = box.getBoundingClientRect();
+      let pos = (x - rect.left) / rect.width;
+      if (pos < 0) pos = 0;
+      if (pos > 1) pos = 1;
+      const pct = (pos * 100).toFixed(1) + '%';
+      overlay.style.width = pct;
+      handle.style.left = pct;
+    }
+
+    box.addEventListener('mousedown', (e) => {
+      isDown = true;
+      updateSlider(e.clientX);
+    });
+    window.addEventListener('mouseup', () => isDown = false);
+    window.addEventListener('mousemove', (e) => {
+      if (!isDown) return;
+      updateSlider(e.clientX);
+    });
+
+    box.addEventListener('touchstart', (e) => {
+      isDown = true;
+      updateSlider(e.touches[0].clientX);
+    }, { passive: true });
+    window.addEventListener('touchend', () => isDown = false);
+    window.addEventListener('touchmove', (e) => {
+      if (!isDown) return;
+      updateSlider(e.touches[0].clientX);
+    }, { passive: true });
+  </script>
+
+</body>
+</html>
